@@ -52,23 +52,18 @@
         - meson
         - ninja
         - docutils
-
+### qemu
     - name: clone qemu
       git:
         repo: https://git.qemu.org/git/qemu.git
         dest: /home/{{user_name}}/qemu
         version: v5.0.1
-    - name: install vagrant
-      become: yes
-      apt:
-        deb: https://releases.hashicorp.com/vagrant/2.2.10/vagrant_2.2.10_x86_64.deb
     - name: make build dir
       file:
         state: directory
         path:  /home/{{user_name}}/qemu/build
     - name: configure qemu
       command:
-#         cmd:
         chdir: /home/{{user_name}}/qemu/build
         argv:
           - ./../configure
@@ -100,7 +95,6 @@
         version: v6.8.0
     - name: configure libvirt with meson
       command:
-#         cmd:
         chdir: /home/{{user_name}}/libvirt
         argv:
           - meson
@@ -114,7 +108,6 @@
         argv:
           - ninja
           - -Cbuild
-
     - name: install libvirt with ninja
       become: yes
       command:
@@ -123,7 +116,6 @@
           - ninja
           - -Cbuild
           - install
-
     - name: ldconfig
       become: yes
       command: ldconfig
@@ -136,7 +128,6 @@
           - kvm
         state: present
         system: no
-
     - name: change socket's mode
       become: yes
       lineinfile:
@@ -144,7 +135,6 @@
         insertafter: '#auth_unix_rw'
         line: 'auth_unix_rw = "none"'
         state: present
-
     - name: start libvirtd.service
       systemd:
         name: libvirtd.service
@@ -152,10 +142,13 @@
         daemon_reload: yes
         enabled: yes
       become: yes
-
+### vagrant
+    - name: install vagrant
+      become: yes
+      apt:
+        deb: https://releases.hashicorp.com/vagrant/2.2.10/vagrant_2.2.10_x86_64.deb
     - name: install vagrant-libvirt
       command: vagrant  plugin install vagrant-libvirt
-
     - name: update vagrant-libvirt's default network address
       block:
         - find:
@@ -170,7 +163,6 @@
             regexp: 192.168.121
             replace: 192.168.200
           with_items: "{{result.files}}"
-
     - name: add paths
       lineinfile:
         path: /home/{{ user_name }}/.bashrc
