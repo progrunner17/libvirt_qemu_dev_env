@@ -4,9 +4,7 @@
   # - ./vars/common_vars.yml
   vars:
     user_name: vagrant
-    git_user: progrunner17
-    git_email: g.sho1500@gmail.com
-
+    
   roles:
     - users
     - apt
