@@ -1,0 +1,182 @@
+---
+- hosts: default
+  vars_files:
+  # - ./vars/common_vars.yml
+  vars:
+    user_name: vagrant
+    git_user: progrunner17
+    git_email: g.sho1500@gmail.com
+
+  roles:
+    - users
+    - apt
+  tasks:
+    - name: install packages
+      become: yes
+      apt:
+        name:
+          - curl
+          - moreutils
+          - git
+          - tree
+          - build-essential
+          - python3
+          - libnfs-dev # qemu --enable-libnfs
+          - python3 # for meson
+          - python3-pip # for meson
+          - libtirpc-dev # for libvirt
+          - ebtables # for vagrant-libvirt
+          - dnsmasq-base
+          - libxslt-dev
+          - libxml2-dev
+          - zlib1g-dev
+          - ruby-dev
+        update_cache: yes
+        force_apt_get: yes
+    - name: install packages build-dep
+      become: yes
+      apt:
+        state: build-dep
+        name:
+          - libvirt-dev
+          - qemu
+          - vagrant
+          - ruby-libvirt
+        update_cache: yes
+        force_apt_get: yes
+        cache_valid_time: 3600
+    - name: install global packages
+      become: yes
+      pip:
+        executable: pip3
+        name: '{{item}}'
+      loop:
+        - meson
+        - ninja
+        - docutils
+
+    - name: clone qemu
+      git:
+        repo: https://git.qemu.org/git/qemu.git
+        dest: /home/{{user_name}}/qemu
+        version: v5.0.1
+    - name: install vagrant
+      become: yes
+      apt:
+        deb: https://releases.hashicorp.com/vagrant/2.2.10/vagrant_2.2.10_x86_64.deb
+    - name: make build dir
+      file:
+        state: directory
+        path:  /home/{{user_name}}/qemu/build
+    - name: configure qemu
+      command:
+#         cmd:
+        chdir: /home/{{user_name}}/qemu/build
+        argv:
+          - ./../configure
+          - --target-list=x86_64-softmmu
+          - --enable-kvm
+          - --enable-virtfs
+          - --enable-vhost-net
+          - --enable-vhost-kernel
+          - --enable-vhost-vsock
+          - --enable-vhost-crypto
+          - --enable-vhost-scsi
+          - --enable-vhost-user
+          - --enable-libnfs
+    - name: Build qemu
+      community.general.make:
+        chdir: /home/{{user_name}}/qemu/build
+        params:
+          NUM_THREADS: 8
+    - name: install qemu
+      become: yes
+      community.general.make:
+        chdir: /home/{{user_name}}/qemu/build
+        target: install
+#### libvirt
+    - name: clone libvirt
+      git:
+        repo: https://github.com/libvirt/libvirt
+        dest: /home/{{user_name}}/libvirt
+        version: v6.8.0
+    - name: configure libvirt with meson
+      command:
+#         cmd:
+        chdir: /home/{{user_name}}/libvirt
+        argv:
+          - meson
+          - build
+          - -Dsystem=true
+    - name: reset connection
+      meta: reset_connection
+    - name: build libvirt with ninja
+      command:
+        chdir: /home/{{user_name}}/libvirt
+        argv:
+          - ninja
+          - -Cbuild
+
+    - name: install libvirt with ninja
+      become: yes
+      command:
+        chdir: /home/{{user_name}}/libvirt
+        argv:
+          - ninja
+          - -Cbuild
+          - install
+
+    - name: ldconfig
+      become: yes
+      command: ldconfig
+
+    - name: Create libvirt-qemu user
+      become: yes
+      user:
+        name: libvirt-qemu
+        groups:
+          - kvm
+        state: present
+        system: no
+
+    - name: change socket's mode
+      become: yes
+      lineinfile:
+        path: "/etc/libvirt/libvirtd.conf"
+        insertafter: '#auth_unix_rw'
+        line: 'auth_unix_rw = "none"'
+        state: present
+
+    - name: start libvirtd.service
+      systemd:
+        name: libvirtd.service
+        state: restarted
+        daemon_reload: yes
+        enabled: yes
+      become: yes
+
+    - name: install vagrant-libvirt
+      command: vagrant  plugin install vagrant-libvirt
+
+    - name: update vagrant-libvirt's default network address
+      block:
+        - find:
+            paths:  /home/{{user_name}}/.vagrant.d/gems/
+            file_type: file
+            recurse: yes
+            contains: '.*192.168.121.*'
+          register: result
+        - debug: msg={{result.files}}
+        - replace:
+            path: "{{ item.path }}"
+            regexp: 192.168.121
+            replace: 192.168.200
+          with_items: "{{result.files}}"
+
+    - name: add paths
+      lineinfile:
+        path: /home/{{ user_name }}/.bashrc
+        line: "{{item}}"
+      with_items:
+        - 'export=LIBVIRT_DEFAULT_URI=qemu:///system'
+        - 'export=VAGRANT_DEFAULT_PROVIDER=libvirt'

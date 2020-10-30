@@ -1,0 +1,20 @@
+- name: change mirror
+  become: yes
+  replace:
+    path: "/etc/apt/sources.list"
+    regexp: 'http://.*(archive|security)\.ubuntu\.com/ubuntu(.+)'
+    replace: 'http://ftp.iij.ad.jp/pub/linux/ubuntu/archive\g<2>'
+  register: apt_mirror
+
+
+- name: uncomment deb-src repository
+  become: yes
+  replace:
+    path:   "/etc/apt/sources.list"
+    regexp: '^# *(deb-src.*)$'
+    replace: '\1'
+  register: apt_deb_src
+  when: apt_mirror is skipped or apt_mirror is succeeded or apt_mirror is changed
+
+- name: reset connection
+  meta: reset_connection

@@ -1,0 +1,27 @@
+- name: keep PATH on sudo
+  become: yes
+  lineinfile:
+    path: "/etc/sudoers"
+    line: 'Defaults    env_keep += "PATH"'
+    state: present
+    validate: /usr/sbin/visudo -cf %s
+
+- name: keep GOPATH on sudo
+  become: yes
+  lineinfile:
+    path: "/etc/sudoers"
+    line: 'Defaults    env_keep += "GOPATH"'
+    state: present
+    validate: /usr/sbin/visudo -cf %s
+
+# NOTE: Yaml requires escaping backslashes in double quotes but not in single quotes
+- name: comment out secure_path
+  become: yes
+  lineinfile:
+    path: /etc/sudoers
+    regexp: '^(Defaults\s+secure_path=.*)$'
+    line: '# \1'
+    backrefs: yes
+
+- name: reset connection
+  meta: reset_connection
