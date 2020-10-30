@@ -9,8 +9,8 @@ libvirtとQEMUを自前でビルドしてテストするための環境自動構
   * [community.general collection](https://github.com/ansible-collections/community.general) のインストールも必要
 * vagrant
   * [vagrant-libvirt](https://github.com/vagrant-libvirt/vagrant-libvirt) (plugin)
-    * libvirt
-    * QEMU/KVM (nested 有効化)
+* libvirt
+* qemu (nested 要有効化)
 
 ## 使用例
 #### ホスト
